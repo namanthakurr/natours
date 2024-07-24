@@ -38,30 +38,75 @@ const createSendToken = (user, statusCode, res) => {
   });
 };
 
+// exports.signup = catchAsync(async (req, res, next) => {
+//   // Check if the role is provided in the request body and is valid
+//   let role = 'user';
+//   if (
+//     req.body.role &&
+//     ['user', 'guide', 'lead-guide', 'admin'].includes(req.body.role)
+//   ) {
+//     role = req.body.role;
+//   }
+
+//   const newUser = await User.create({
+//     name: req.body.name,
+//     email: req.body.email,
+//     password: req.body.password,
+//     passwordConfirm: req.body.passwordConfirm,
+//     passwordChangedAt: req.body.passwordChangedAt,
+//     role: role,
+//   });
+
+//   const url = `${req.protocol}://${req.get('host')}/me`;
+//   // console.log(url);
+//   await new Email(newUser, url).sendWelcome();
+
+//   createSendToken(newUser, 201, res);
+// });
+
 exports.signup = catchAsync(async (req, res, next) => {
-  // Check if the role is provided in the request body and is valid
-  let role = 'user';
-  if (
-    req.body.role &&
-    ['user', 'guide', 'lead-guide', 'admin'].includes(req.body.role)
-  ) {
-    role = req.body.role;
+  try {
+    const { name, email, password, passwordConfirm, role = 'user' } = req.body;
+
+    // Validate that all fields are strings
+    if (
+      typeof name !== 'string' ||
+      typeof email !== 'string' ||
+      typeof password !== 'string' ||
+      typeof passwordConfirm !== 'string'
+    ) {
+      throw new Error('Invalid input types');
+    }
+
+    // Check if the role is provided in the request body and is valid
+    const validRoles = ['user', 'guide', 'lead-guide', 'admin'];
+    const userRole = validRoles.includes(role) ? role : 'user';
+
+    const newUser = await User.create({
+      name,
+      email,
+      password,
+      passwordConfirm,
+      role: userRole,
+    });
+
+    const url = `${req.protocol}://${req.get('host')}/me`;
+
+    // Send welcome email
+    try {
+      await new Email(newUser, url).sendWelcome();
+    } catch (emailError) {
+      console.error('Error sending welcome email:', emailError);
+    }
+
+    createSendToken(newUser, 201, res);
+  } catch (err) {
+    console.error('Error during signup:', err);
+    res.status(500).json({
+      status: 'error',
+      message: err.message || 'Internal Server Error. Please try again later.',
+    });
   }
-
-  const newUser = await User.create({
-    name: req.body.name,
-    email: req.body.email,
-    password: req.body.password,
-    passwordConfirm: req.body.passwordConfirm,
-    passwordChangedAt: req.body.passwordChangedAt,
-    role: role,
-  });
-
-  const url = `${req.protocol}://${req.get('host')}/me`;
-  // console.log(url);
-  await new Email(newUser, url).sendWelcome();
-
-  createSendToken(newUser, 201, res);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
